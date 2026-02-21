@@ -3,37 +3,36 @@
 import { useEffect, useState } from "react";
 import { db } from "./firebase/config";
 import { ref, onValue } from "firebase/database";
-
-interface Post {
-  title: string;
-  content: string;
-  userName: string;
-}
+import PostCard from "./components/PostCard";
+import { normalizePostsMap, sortPostsNewestFirst, type PostRecord } from "./lib/posts";
 
 export default function Home() {
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [posts, setPosts] = useState<PostRecord[]>([]);
 
   useEffect(() => {
     const postsRef = ref(db, "posts");
     const unsubscribe = onValue(postsRef, (snapshot) => {
       const data = snapshot.val();
-      const loadedPosts: Post[] = data ? Object.values(data) : [];
-      setPosts(loadedPosts.reverse()); // reset state, avoid duplicates
+      const loadedPosts = normalizePostsMap(data);
+      setPosts(sortPostsNewestFirst(loadedPosts));
     });
+
     return () => unsubscribe();
   }, []);
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1>Home Feed</h1>
-      {posts.length === 0 && <p>No posts yet.</p>}
-      {posts.map((post, index) => (
-        <div key={index} style={{ marginTop: 20, padding: 15, border: "1px solid #ccc", borderRadius: 8 }}>
-          <h2>{post.title}</h2>
-          <p>{post.content}</p>
-          <small>By: {post.userName}</small>
-        </div>
-      ))}
+    <div className="stack">
+      <h1 className="page-title">Home Feed</h1>
+      {posts.length === 0 ? (
+        <div className="card">No posts yet.</div>
+      ) : (
+        <section className="post-list">
+          {posts.map((post) => (
+            <PostCard key={post.id} post={post} excerpt />
+          ))}
+        </section>
+      )}
     </div>
   );
 }
+

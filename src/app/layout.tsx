@@ -1,4 +1,5 @@
-import Link from "next/link";
+import Header from "./components/Header";
+import "./globals.css";
 
 export default function RootLayout({
   children,
@@ -6,21 +7,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html>
-      <body style={{ fontFamily: "Arial" }}>
-        <nav
-          style={{
-            padding: 15,
-            borderBottom: "1px solid #ccc",
-            marginBottom: 20,
-          }}
-        >
-          <Link href="/" style={{ marginRight: 15 }}>Home</Link>
-          <Link href="/create" style={{ marginRight: 15 }}>Add Post</Link>
-          <Link href="/search">Search</Link>
-        </nav>
-
-        {children}
+    <html lang="en">
+      <body>
+        <Header />
+        <main className="app-shell">{children}</main>
       </body>
     </html>
   );
