@@ -13,13 +13,23 @@ export default function CreatePost() {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [accessBlocked, setAccessBlocked] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
         setAuthLoading(false);
+        setAccessBlocked(true);
         router.replace("/login");
+        return;
+      }
+
+      const usesPassword = currentUser.providerData.some((provider) => provider.providerId === "password");
+      if (usesPassword && !currentUser.emailVerified) {
+        setAuthLoading(false);
+        setAccessBlocked(true);
+        router.replace("/login?reason=verify");
         return;
       }
 
@@ -72,7 +82,7 @@ export default function CreatePost() {
   }
 
   if (!user) {
-    return <div className="card">Redirecting to login...</div>;
+    return <div className="card">{accessBlocked ? "Access restricted. Redirecting..." : "Redirecting to login..."}</div>;
   }
 
   return (
@@ -101,4 +111,3 @@ export default function CreatePost() {
     </div>
   );
 }
-

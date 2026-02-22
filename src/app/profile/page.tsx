@@ -13,14 +13,25 @@ export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<PostRecord[]>([]);
+  const [accessBlocked, setAccessBlocked] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (!currentUser) {
         setLoading(false);
+        setAccessBlocked(true);
         router.replace("/login");
         return;
       }
+
+      const usesPassword = currentUser.providerData.some((provider) => provider.providerId === "password");
+      if (usesPassword && !currentUser.emailVerified) {
+        setLoading(false);
+        setAccessBlocked(true);
+        router.replace("/login?reason=verify");
+        return;
+      }
+
       setUser(currentUser);
       setLoading(false);
     });
@@ -62,7 +73,7 @@ export default function ProfilePage() {
   }
 
   if (!user) {
-    return <div className="card">Redirecting to login...</div>;
+    return <div className="card">{accessBlocked ? "Access restricted. Redirecting..." : "Redirecting to login..."}</div>;
   }
 
   return (
@@ -92,4 +103,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-

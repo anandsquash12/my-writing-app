@@ -9,9 +9,23 @@ export default function Header() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const syncAuthCookies = (currentUser: User | null) => {
+    if (!currentUser) {
+      document.cookie = "mw-auth=; path=/; max-age=0; samesite=lax";
+      document.cookie = "mw-verified=; path=/; max-age=0; samesite=lax";
+      return;
+    }
+
+    const usesPassword = currentUser.providerData.some((provider) => provider.providerId === "password");
+    const verified = !usesPassword || currentUser.emailVerified;
+    document.cookie = "mw-auth=1; path=/; max-age=2592000; samesite=lax";
+    document.cookie = `mw-verified=${verified ? "1" : "0"}; path=/; max-age=2592000; samesite=lax`;
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      syncAuthCookies(currentUser);
       setLoading(false);
     });
 
@@ -21,6 +35,7 @@ export default function Header() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
+      syncAuthCookies(null);
     } catch (error) {
       console.error("Logout failed:", error);
       const message = error instanceof Error ? error.message : "Failed to log out.";
@@ -42,6 +57,17 @@ export default function Header() {
         </Link>
         <Link href="/search" className="nav-link">
           Search
+        </Link>
+        {loading ? null : user ? (
+          <Link href="/dashboard" className="nav-link">
+            Dashboard
+          </Link>
+        ) : null}
+        <Link href="/about" className="nav-link">
+          About
+        </Link>
+        <Link href="/contact" className="nav-link">
+          Contact
         </Link>
         {loading ? null : user ? (
           <Link href="/profile" className="nav-link">
@@ -67,4 +93,3 @@ export default function Header() {
     </nav>
   );
 }
-

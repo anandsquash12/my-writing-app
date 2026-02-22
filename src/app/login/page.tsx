@@ -1,14 +1,18 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { auth } from "../firebase/config";
 import {
   createUserWithEmailAndPassword,
   fetchSignInMethodsForEmail,
+  GoogleAuthProvider,
+  sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
-  GoogleAuthProvider,
+  signOut,
 } from "firebase/auth";
 
 export default function LoginPage() {
@@ -18,32 +22,97 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const reason = params.get("reason");
+    if (reason === "verify") {
+      setErrorMessage("Please verify your email before accessing that page.");
+    } else if (reason === "auth") {
+      setErrorMessage("Please login to continue.");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setResendCooldown((current) => (current > 0 ? current - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  const clearMessages = () => {
+    setErrorMessage("");
+    setSuccessMessage("");
+  };
+
+  const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+  const syncAuthCookies = (verified: boolean) => {
+    document.cookie = "mw-auth=1; path=/; max-age=2592000; samesite=lax";
+    document.cookie = `mw-verified=${verified ? "1" : "0"}; path=/; max-age=2592000; samesite=lax`;
+  };
 
   const handleEmailLogin = async () => {
-    const trimmedEmail = email.trim();
+    const trimmedEmail = email.trim().toLowerCase();
 
     if (!trimmedEmail || !password) {
-      alert("Email and password required");
+      setErrorMessage("Email and password are required.");
+      return;
+    }
+
+    if (!isValidEmail(trimmedEmail)) {
+      setErrorMessage("Please enter a valid email address.");
       return;
     }
 
     try {
       setLoading(true);
+      clearMessages();
       const methods = await fetchSignInMethodsForEmail(auth, trimmedEmail);
 
       if (methods.includes("google.com") && !methods.includes("password")) {
-        alert("This email is registered using Google. Please login with Google.");
+        setErrorMessage("This email is registered using Google. Please login with Google.");
         return;
       }
 
-      await signInWithEmailAndPassword(auth, trimmedEmail, password);
+      const credential = await signInWithEmailAndPassword(auth, trimmedEmail, password);
+      await credential.user.reload();
+      const currentUser = auth.currentUser;
+      const usesPassword = credential.user.providerData.some((provider) => provider.providerId === "password");
+      const isVerified = currentUser?.emailVerified ?? credential.user.emailVerified;
+
+      if (usesPassword && !isVerified) {
+        await signOut(auth);
+        setPendingVerificationEmail(trimmedEmail);
+        setErrorMessage("Email not verified. Please verify and try again.");
+        return;
+      }
+
+      syncAuthCookies(true);
       router.push("/");
     } catch (error: any) {
       const code = error?.code;
-      if (code === "auth/invalid-credential" || code === "auth/user-not-found") {
-        alert("Invalid email or password.");
+      if (code === "auth/user-not-found") {
+        setErrorMessage("No account found with this email.");
+      } else if (code === "auth/wrong-password") {
+        setErrorMessage("Incorrect password.");
+      } else if (code === "auth/invalid-email") {
+        setErrorMessage("Please enter a valid email address.");
+      } else if (code === "auth/invalid-credential") {
+        setErrorMessage("Invalid email or password.");
       } else {
-        alert(error.message);
+        setErrorMessage(error.message || "Login failed.");
       }
     } finally {
       setLoading(false);
@@ -51,40 +120,166 @@ export default function LoginPage() {
   };
 
   const handleEmailRegister = async () => {
-    const trimmedEmail = email.trim();
+    const trimmedEmail = email.trim().toLowerCase();
 
     if (!trimmedEmail || !password) {
-      alert("Email and password required");
+      setErrorMessage("Email and password are required.");
+      return;
+    }
+
+    if (!isValidEmail(trimmedEmail)) {
+      setErrorMessage("Please enter a valid email address.");
       return;
     }
 
     try {
       setLoading(true);
+      clearMessages();
       const methods = await fetchSignInMethodsForEmail(auth, trimmedEmail);
 
       if (methods.includes("google.com") && !methods.includes("password")) {
-        alert("This email is registered using Google. Please login with Google.");
+        setErrorMessage("This email is registered using Google. Please login with Google.");
         return;
       }
 
       if (methods.includes("password")) {
-        alert("Email already registered. Please log in.");
+        setErrorMessage("Email already registered. Please log in.");
         return;
       }
 
-      await createUserWithEmailAndPassword(auth, trimmedEmail, password);
-      router.push("/");
+      const credential = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
+      await sendEmailVerification(credential.user);
+      setResendCooldown(60);
+      await signOut(auth);
+      setPendingVerificationEmail(trimmedEmail);
+      setMode("login");
+      setSuccessMessage("Account created. Verification email sent. Verify your email, then log in.");
     } catch (error: any) {
       const code = error?.code;
       if (code === "auth/email-already-in-use") {
-        alert("Email already registered. Please log in.");
+        setErrorMessage("Email already registered. Please log in.");
+      } else if (code === "auth/invalid-email") {
+        setErrorMessage("Please enter a valid email address.");
+      } else if (code === "auth/invalid-credential") {
+        setErrorMessage("Invalid registration request.");
       } else if (code === "auth/weak-password") {
-        alert("Password should be at least 6 characters.");
+        setErrorMessage("Password should be at least 6 characters.");
       } else {
-        alert(error.message);
+        setErrorMessage(error.message || "Registration failed.");
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    const targetEmail = (pendingVerificationEmail || email).trim();
+
+    if (!targetEmail) {
+      setErrorMessage("Enter your email first.");
+      return;
+    }
+
+    if (!password) {
+      setErrorMessage("Enter your password to resend verification email.");
+      return;
+    }
+
+    if (!isValidEmail(targetEmail)) {
+      setErrorMessage("Please enter a valid email address.");
+      return;
+    }
+
+    if (resendCooldown > 0) {
+      setErrorMessage(`Please wait ${resendCooldown}s before resending verification email.`);
+      return;
+    }
+
+    try {
+      setResending(true);
+      clearMessages();
+      const methods = await fetchSignInMethodsForEmail(auth, targetEmail);
+
+      if (methods.includes("google.com") && !methods.includes("password")) {
+        setErrorMessage("This email is registered using Google. Please login with Google.");
+        return;
+      }
+
+      const credential = await signInWithEmailAndPassword(auth, targetEmail, password);
+      await credential.user.reload();
+      const currentUser = auth.currentUser ?? credential.user;
+      if (currentUser.emailVerified) {
+        await signOut(auth);
+        setSuccessMessage("Email already verified.");
+        return;
+      }
+
+      await sendEmailVerification(currentUser);
+      setResendCooldown(60);
+      await signOut(auth);
+      setPendingVerificationEmail(targetEmail);
+      setSuccessMessage("Verification email sent.");
+    } catch (error: any) {
+      const code = error?.code;
+      if (code === "auth/user-not-found") {
+        setErrorMessage("No account found.");
+      } else if (code === "auth/wrong-password") {
+        setErrorMessage("Incorrect password.");
+      } else if (code === "auth/invalid-email") {
+        setErrorMessage("Invalid email format.");
+      } else if (code === "auth/invalid-credential") {
+        setErrorMessage("Invalid email or password.");
+      } else {
+        setErrorMessage(error.message || "Failed to resend verification email.");
+      }
+    } finally {
+      setResending(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    const trimmedEmail = email.trim().toLowerCase();
+
+    if (!trimmedEmail) {
+      setErrorMessage("Enter your email to reset password.");
+      return;
+    }
+
+    if (!isValidEmail(trimmedEmail)) {
+      setErrorMessage("Please enter a valid email address.");
+      return;
+    }
+
+    try {
+      setResetting(true);
+      clearMessages();
+      const methods = await fetchSignInMethodsForEmail(auth, trimmedEmail);
+
+      if (methods.includes("google.com") && !methods.includes("password")) {
+        setErrorMessage("This email is registered using Google. Please login with Google.");
+        return;
+      }
+
+      if (!methods.includes("password")) {
+        setErrorMessage("No email/password account found for this email.");
+        return;
+      }
+
+      await sendPasswordResetEmail(auth, trimmedEmail);
+      setSuccessMessage("Password reset email sent. Check your inbox.");
+    } catch (error: any) {
+      const code = error?.code;
+      if (code === "auth/invalid-email") {
+        setErrorMessage("Please enter a valid email address.");
+      } else if (code === "auth/user-not-found") {
+        setErrorMessage("No account found with this email.");
+      } else if (code === "auth/invalid-credential") {
+        setErrorMessage("Unable to reset password for this account.");
+      } else {
+        setErrorMessage(error.message || "Failed to send password reset email.");
+      }
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -99,67 +294,109 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     try {
+      setLoading(true);
+      clearMessages();
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
+      syncAuthCookies(true);
       router.push("/");
     } catch (error: any) {
-      alert(error.message);
+      setErrorMessage(error.message || "Google login failed.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen gap-4">
-      <h1 className="text-2xl font-bold">Login</h1>
+    <div className="stack">
+      <h1 className="page-title">Login</h1>
 
-      <div className="flex gap-2 w-80">
-        <button
-          type="button"
-          onClick={() => setMode("login")}
-          className={`p-2 rounded flex-1 ${mode === "login" ? "bg-black text-white" : "bg-gray-200"}`}
-        >
-          Login
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("register")}
-          className={`p-2 rounded flex-1 ${mode === "register" ? "bg-black text-white" : "bg-gray-200"}`}
-        >
-          Register
-        </button>
+      <div className="card form-stack">
+        <div className="mode-toggle">
+          <button
+            type="button"
+            onClick={() => {
+              clearMessages();
+              setMode("login");
+            }}
+            className={mode === "login" ? "primary-button" : "secondary-button"}
+            disabled={loading || resending || resetting}
+          >
+            Login
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              clearMessages();
+              setMode("register");
+            }}
+            className={mode === "register" ? "primary-button" : "secondary-button"}
+            disabled={loading || resending || resetting}
+          >
+            Register
+          </button>
+        </div>
+
+        {errorMessage ? <p className="form-error">{errorMessage}</p> : null}
+        {successMessage ? <p className="form-success">{successMessage}</p> : null}
+
+        <form onSubmit={handleEmailSubmit} className="form-stack">
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="input"
+            disabled={loading || resending || resetting}
+          />
+
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="input"
+            disabled={loading || resending || resetting}
+          />
+
+          <button type="submit" disabled={loading || resending || resetting} className="primary-button">
+            {loading ? "Please wait..." : mode === "login" ? "Login with Email" : "Register with Email"}
+          </button>
+        </form>
+
+        {mode === "login" ? (
+          <div className="mode-toggle">
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              disabled={resetting || loading || resending}
+              className="secondary-button"
+            >
+              {resetting ? "Sending reset link..." : "Quick Reset"}
+            </button>
+            <Link href="/reset-password" className="inline-link" style={{ alignSelf: "center" }}>
+              Open Reset Page
+            </Link>
+          </div>
+        ) : null}
+
+        {mode === "login" ? (
+          <button
+            type="button"
+            onClick={handleResendVerification}
+            disabled={resending || loading || resetting || resendCooldown > 0}
+            className="secondary-button"
+          >
+            {resending ? "Resending..." : resendCooldown > 0 ? `Resend Verification Email (${resendCooldown}s)` : "Resend Verification Email"}
+          </button>
+        ) : null}
       </div>
 
-      <form onSubmit={handleEmailSubmit} className="flex flex-col gap-3 w-80">
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="border p-2 rounded"
-        />
-
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="border p-2 rounded"
-        />
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="bg-black text-white p-2 rounded"
-        >
-          {loading ? "Please wait..." : mode === "login" ? "Login with Email" : "Register with Email"}
+      <div className="card form-stack">
+        <button onClick={handleGoogleLogin} className="primary-button" disabled={loading || resending || resetting}>
+          Continue with Google
         </button>
-      </form>
-
-      <button
-        onClick={handleGoogleLogin}
-        className="bg-red-500 text-white p-2 rounded w-80"
-      >
-        Login with Google
-      </button>
+      </div>
     </div>
   );
 }

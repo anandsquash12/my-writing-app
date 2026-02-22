@@ -30,6 +30,20 @@ a {
   padding: 20px 16px 40px;
 }
 
+.app-footer {
+  max-width: 900px;
+  margin: 8px auto 24px;
+  padding: 0 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .app-nav {
   position: sticky;
   top: 0;
@@ -74,6 +88,29 @@ a {
 
 .page-title {
   margin: 8px 0 14px;
+}
+
+.hero-card {
+  border: 1px solid var(--border);
+  background: linear-gradient(145deg, #fff, #f3ebe0);
+  border-radius: 14px;
+  padding: 18px;
+  display: grid;
+  gap: 8px;
+}
+
+.hero-tag {
+  margin: 0;
+  color: var(--accent-dark);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.hero-title {
+  margin: 0;
+  font-size: clamp(1.4rem, 3.5vw, 2rem);
 }
 
 .card {
@@ -149,6 +186,44 @@ a {
   gap: 10px;
 }
 
+.mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.form-error,
+.form-success {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.form-error {
+  border: 1px solid #e8b4b4;
+  background: #fff0f0;
+  color: #8f2c2c;
+}
+
+.form-success {
+  border: 1px solid #b9ddc6;
+  background: #eefaf2;
+  color: #1f6a39;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.stat-value {
+  margin: 4px 0 0;
+  font-size: 1.75rem;
+}
+
 .primary-button,
 .secondary-button,
 .like-button {
@@ -194,5 +269,8 @@ a {
   .app-shell {
     padding: 16px 12px 30px;
   }
-}
 
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
