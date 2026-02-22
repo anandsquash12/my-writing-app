@@ -1,118 +1,165 @@
-"use client";
+﻿"use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth } from "../firebase/config";
 import {
-  GoogleAuthProvider,
   createUserWithEmailAndPassword,
-  onAuthStateChanged,
+  fetchSignInMethodsForEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
+  GoogleAuthProvider,
 } from "firebase/auth";
 
 export default function LoginPage() {
   const router = useRouter();
+
+  const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        router.replace("/");
-      }
-    });
+  const handleEmailLogin = async () => {
+    const trimmedEmail = email.trim();
 
-    return unsubscribe;
-  }, [router]);
-
-  const handleEmailSignUp = async (event: FormEvent) => {
-    event.preventDefault();
+    if (!trimmedEmail || !password) {
+      alert("Email and password required");
+      return;
+    }
 
     try {
-      setBusy(true);
-      await createUserWithEmailAndPassword(auth, email, password);
+      setLoading(true);
+      const methods = await fetchSignInMethodsForEmail(auth, trimmedEmail);
+
+      if (methods.includes("google.com") && !methods.includes("password")) {
+        alert("This email is registered using Google. Please login with Google.");
+        return;
+      }
+
+      await signInWithEmailAndPassword(auth, trimmedEmail, password);
       router.push("/");
-    } catch (error) {
-      console.error("Email sign up failed:", error);
-      const message = error instanceof Error ? error.message : "Sign up failed.";
-      alert(message);
+    } catch (error: any) {
+      const code = error?.code;
+      if (code === "auth/invalid-credential" || code === "auth/user-not-found") {
+        alert("Invalid email or password.");
+      } else {
+        alert(error.message);
+      }
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
   };
 
-  const handleEmailLogin = async (event: FormEvent) => {
-    event.preventDefault();
+  const handleEmailRegister = async () => {
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail || !password) {
+      alert("Email and password required");
+      return;
+    }
 
     try {
-      setBusy(true);
-      await signInWithEmailAndPassword(auth, email, password);
+      setLoading(true);
+      const methods = await fetchSignInMethodsForEmail(auth, trimmedEmail);
+
+      if (methods.includes("google.com") && !methods.includes("password")) {
+        alert("This email is registered using Google. Please login with Google.");
+        return;
+      }
+
+      if (methods.includes("password")) {
+        alert("Email already registered. Please log in.");
+        return;
+      }
+
+      await createUserWithEmailAndPassword(auth, trimmedEmail, password);
       router.push("/");
-    } catch (error) {
-      console.error("Email login failed:", error);
-      const message = error instanceof Error ? error.message : "Login failed.";
-      alert(message);
+    } catch (error: any) {
+      const code = error?.code;
+      if (code === "auth/email-already-in-use") {
+        alert("Email already registered. Please log in.");
+      } else if (code === "auth/weak-password") {
+        alert("Password should be at least 6 characters.");
+      } else {
+        alert(error.message);
+      }
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
+  };
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (mode === "login") {
+      await handleEmailLogin();
+      return;
+    }
+    await handleEmailRegister();
   };
 
   const handleGoogleLogin = async () => {
     try {
-      setBusy(true);
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
       router.push("/");
-    } catch (error) {
-      console.error("Google login failed:", error);
-      const message = error instanceof Error ? error.message : "Google login failed.";
-      alert(message);
-    } finally {
-      setBusy(false);
+    } catch (error: any) {
+      alert(error.message);
     }
   };
 
   return (
-    <div className="stack">
-      <h1 className="page-title">Login</h1>
-      <section className="card">
-        <p className="muted-text">Use email/password or continue with Google.</p>
+    <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+      <h1 className="text-2xl font-bold">Login</h1>
 
-        <form onSubmit={handleEmailLogin} className="form-stack">
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            className="input"
-            required
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="input"
-            required
-          />
-
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="submit" disabled={busy} className="primary-button">
-              {busy ? "Please wait..." : "Login"}
-            </button>
-            <button type="button" onClick={handleEmailSignUp} disabled={busy} className="secondary-button">
-              Sign Up
-            </button>
-          </div>
-        </form>
-
-        <button onClick={handleGoogleLogin} disabled={busy} className="secondary-button" style={{ marginTop: 12 }}>
-          Continue with Google
+      <div className="flex gap-2 w-80">
+        <button
+          type="button"
+          onClick={() => setMode("login")}
+          className={`p-2 rounded flex-1 ${mode === "login" ? "bg-black text-white" : "bg-gray-200"}`}
+        >
+          Login
         </button>
-      </section>
+        <button
+          type="button"
+          onClick={() => setMode("register")}
+          className={`p-2 rounded flex-1 ${mode === "register" ? "bg-black text-white" : "bg-gray-200"}`}
+        >
+          Register
+        </button>
+      </div>
+
+      <form onSubmit={handleEmailSubmit} className="flex flex-col gap-3 w-80">
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="border p-2 rounded"
+        />
+
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="border p-2 rounded"
+        />
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="bg-black text-white p-2 rounded"
+        >
+          {loading ? "Please wait..." : mode === "login" ? "Login with Email" : "Register with Email"}
+        </button>
+      </form>
+
+      <button
+        onClick={handleGoogleLogin}
+        className="bg-red-500 text-white p-2 rounded w-80"
+      >
+        Login with Google
+      </button>
     </div>
   );
 }
-
