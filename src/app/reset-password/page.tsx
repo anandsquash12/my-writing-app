@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { auth } from "../firebase/config";
-import { fetchSignInMethodsForEmail, sendPasswordResetEmail } from "firebase/auth";
+import { sendPasswordResetEmail } from "firebase/auth";
 
 export default function ResetPasswordPage() {
   const [email, setEmail] = useState("");
@@ -13,16 +13,16 @@ export default function ResetPasswordPage() {
 
   const handleReset = async (event: React.FormEvent) => {
     event.preventDefault();
-    const trimmedEmail = email.trim().toLowerCase();
+    const e = email.trim().toLowerCase();
 
-    if (!trimmedEmail) {
-      setError("Email is required.");
+    if (!e) {
+      setError("Enter email");
       setMessage("");
       return;
     }
 
-    if (!isValidEmail(trimmedEmail)) {
-      setError("Please enter a valid email address.");
+    if (!isValidEmail(e)) {
+      setError("Enter a valid email");
       setMessage("");
       return;
     }
@@ -31,30 +31,18 @@ export default function ResetPasswordPage() {
       setLoading(true);
       setError("");
       setMessage("");
-      const methods = await fetchSignInMethodsForEmail(auth, trimmedEmail);
-
-      if (methods.includes("google.com") && !methods.includes("password")) {
-        setError("This email is registered using Google. Please login with Google.");
-        return;
-      }
-
-      if (!methods.includes("password")) {
-        setError("No email/password account found for this email.");
-        return;
-      }
-
-      await sendPasswordResetEmail(auth, trimmedEmail);
-      setMessage("Password reset link sent. Check your inbox.");
+      await sendPasswordResetEmail(auth, e);
+      setMessage("Password reset email sent.");
     } catch (resetError: any) {
       const code = resetError?.code;
       if (code === "auth/invalid-email") {
-        setError("Please enter a valid email address.");
+        setError("Enter a valid email.");
       } else if (code === "auth/user-not-found") {
         setError("No account found with this email.");
-      } else if (code === "auth/invalid-credential") {
-        setError("Unable to reset password for this account.");
+      } else if (code === "auth/too-many-requests") {
+        setError("Too many attempts. Try later.");
       } else {
-        setError(resetError.message || "Failed to send password reset email.");
+        setError(resetError.message);
       }
     } finally {
       setLoading(false);

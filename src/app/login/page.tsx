@@ -238,45 +238,33 @@ export default function LoginPage() {
   };
 
   const handleForgotPassword = async () => {
-    const trimmedEmail = email.trim().toLowerCase();
+    const e = email.trim().toLowerCase();
 
-    if (!trimmedEmail) {
-      setErrorMessage("Enter your email to reset password.");
+    if (!e) {
+      setErrorMessage("Enter email");
       return;
     }
 
-    if (!isValidEmail(trimmedEmail)) {
-      setErrorMessage("Please enter a valid email address.");
+    if (!isValidEmail(e)) {
+      setErrorMessage("Enter a valid email");
       return;
     }
 
     try {
       setResetting(true);
       clearMessages();
-      const methods = await fetchSignInMethodsForEmail(auth, trimmedEmail);
-
-      if (methods.includes("google.com") && !methods.includes("password")) {
-        setErrorMessage("This email is registered using Google. Please login with Google.");
-        return;
-      }
-
-      if (!methods.includes("password")) {
-        setErrorMessage("No email/password account found for this email.");
-        return;
-      }
-
-      await sendPasswordResetEmail(auth, trimmedEmail);
-      setSuccessMessage("Password reset email sent. Check your inbox.");
+      await sendPasswordResetEmail(auth, e);
+      setSuccessMessage("Password reset email sent.");
     } catch (error: any) {
       const code = error?.code;
       if (code === "auth/invalid-email") {
-        setErrorMessage("Please enter a valid email address.");
+        setErrorMessage("Enter a valid email.");
       } else if (code === "auth/user-not-found") {
         setErrorMessage("No account found with this email.");
-      } else if (code === "auth/invalid-credential") {
-        setErrorMessage("Unable to reset password for this account.");
+      } else if (code === "auth/too-many-requests") {
+        setErrorMessage("Too many attempts. Try later.");
       } else {
-        setErrorMessage(error.message || "Failed to send password reset email.");
+        setErrorMessage(error.message);
       }
     } finally {
       setResetting(false);
