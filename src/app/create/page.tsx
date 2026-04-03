@@ -5,14 +5,36 @@ import { db, auth } from "../firebase/config";
 import { ref, push, set } from "firebase/database";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { tokenizeForSearch } from "../lib/posts";
+import {
+  buildPostKeywords,
+  POST_LANGUAGES,
+  POST_MOODS,
+  POST_TYPES,
+  type PostLanguage,
+  type PostMood,
+  type PostStatus,
+  type PostType,
+  type PostVisibility,
+} from "../lib/posts";
+import RichTextEditor from "../components/RichTextEditor";
+import { findBannedWords } from "../lib/moderation";
+
+function stripHtml(value: string): string {
+  return value.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+}
 
 export default function CreatePost() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [type, setType] = useState<PostType>("Shayari");
+  const [language, setLanguage] = useState<PostLanguage>("Hindi");
+  const [mood, setMood] = useState<PostMood>("hope");
+  const [visibility, setVisibility] = useState<PostVisibility>("public");
+  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [tagsInput, setTagsInput] = useState("");
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savingStatus, setSavingStatus] = useState<PostStatus | null>(null);
   const [accessBlocked, setAccessBlocked] = useState(false);
   const router = useRouter();
 
@@ -48,32 +70,77 @@ export default function CreatePost() {
     return user.displayName || user.email || "Anonymous";
   }, [user]);
 
-  const handleSubmit = async () => {
-    if (!title.trim() || !content.trim() || !user) {
+  const handleSubmit = async (status: PostStatus) => {
+    const plainContent = stripHtml(content);
+    if (!title.trim() || !plainContent || !user) {
       alert("Title and content are required.");
       return;
     }
+    const bannedMatches = findBannedWords(`${title} ${plainContent}`);
+    if (bannedMatches.length > 0) {
+      alert(`Post blocked due to banned words: ${Array.from(new Set(bannedMatches)).join(", ")}`);
+      return;
+    }
+
+    const tags = Array.from(
+      new Set(
+        tagsInput
+          .split(",")
+          .map((tag) => tag.trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    );
+
+    const keywordAuthorName = isAnonymous ? "Anonymous Writer" : authorName;
 
     try {
-      setSaving(true);
-      const postsRef = ref(db, "posts");
-      const newPostRef = push(postsRef);
-      await set(newPostRef, {
+      setSavingStatus(status);
+      // ALL posts save to /quotes collection
+      const quotesRef = ref(db, "quotes");
+      const newPostRef = push(quotesRef);
+      const now = Date.now();
+      
+      const postData = {
+        id: newPostRef.key,
         authorId: user.uid,
         authorName,
         title: title.trim(),
         content: content.trim(),
-        createdAt: Date.now(),
-        keywords: tokenizeForSearch(`${title} ${content}`),
+        createdAt: now,
+        updatedAt: now,
+        visibility,
+        status,
+        keywords: buildPostKeywords({
+          title: title.trim(),
+          content: plainContent,
+          authorName: keywordAuthorName,
+          tags,
+          type,
+          language,
+          mood,
+        }),
+        tags,
+        type,
+        language,
+        mood,
+        isAnonymous,
         likeCount: 0,
-      });
+        viewCount: 0,
+      };
+      
+      console.log("📝 CREATING NEW POST IN /quotes:", postData);
+      
+      await set(newPostRef, postData);
+      
+      console.log("✅ POST SAVED TO /quotes:", newPostRef.key);
+      
       router.push("/");
     } catch (error) {
       console.error("Failed to add post:", error);
       const message = error instanceof Error ? error.message : "Failed to add post.";
       alert(message);
     } finally {
-      setSaving(false);
+      setSavingStatus(null);
     }
   };
 
@@ -98,15 +165,63 @@ export default function CreatePost() {
           onChange={(event) => setTitle(event.target.value)}
           className="input"
         />
-        <textarea
-          placeholder="Write your shayari..."
-          value={content}
-          onChange={(event) => setContent(event.target.value)}
-          className="textarea"
+        <RichTextEditor value={content} onChange={setContent} />
+        <select value={type} onChange={(event) => setType(event.target.value as PostType)} className="input">
+          {POST_TYPES.map((postType) => (
+            <option key={postType} value={postType}>
+              {postType}
+            </option>
+          ))}
+        </select>
+        <select
+          value={language}
+          onChange={(event) => setLanguage(event.target.value as PostLanguage)}
+          className="input"
+        >
+          {POST_LANGUAGES.map((postLanguage) => (
+            <option key={postLanguage} value={postLanguage}>
+              {postLanguage}
+            </option>
+          ))}
+        </select>
+        <select value={mood} onChange={(event) => setMood(event.target.value as PostMood)} className="input">
+          {POST_MOODS.map((postMood) => (
+            <option key={postMood} value={postMood}>
+              {postMood}
+            </option>
+          ))}
+        </select>
+        <label className="checkbox-row switch-row">
+          <input
+            type="checkbox"
+            checked={isAnonymous}
+            onChange={(event) => setIsAnonymous(event.target.checked)}
+            className="switch-input"
+          />
+          <span>Post Anonymously</span>
+        </label>
+        <input
+          placeholder="Tags (comma separated)"
+          value={tagsInput}
+          onChange={(event) => setTagsInput(event.target.value)}
+          className="input"
         />
-        <button onClick={handleSubmit} disabled={saving} className="primary-button">
-          {saving ? "Saving..." : "Publish Post"}
-        </button>
+        <select
+          value={visibility}
+          onChange={(event) => setVisibility(event.target.value as PostVisibility)}
+          className="input"
+        >
+          <option value="public">Public</option>
+          <option value="private">Private</option>
+        </select>
+        <div className="mode-toggle">
+          <button onClick={() => handleSubmit("draft")} disabled={savingStatus !== null} className="secondary-button">
+            {savingStatus === "draft" ? "Saving..." : "Save as Draft"}
+          </button>
+          <button onClick={() => handleSubmit("published")} disabled={savingStatus !== null} className="primary-button">
+            {savingStatus === "published" ? "Publishing..." : "Publish"}
+          </button>
+        </div>
       </div>
     </div>
   );

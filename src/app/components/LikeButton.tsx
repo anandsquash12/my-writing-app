@@ -1,89 +1,100 @@
 "use client";
 
+import { onAuthStateChanged, type User } from "firebase/auth";
+import { get, onValue, ref, set } from "firebase/database";
 import { useEffect, useState } from "react";
 import { auth, db } from "../firebase/config";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { onValue, ref, runTransaction } from "firebase/database";
-import { useRouter } from "next/navigation";
+import { createNotification } from "../lib/notifications";
 
 interface LikeButtonProps {
   postId: string;
-  likeCount: number;
+  likeCount?: number;
+  authorId?: string;
+  postTitle?: string;
 }
 
-export default function LikeButton({ postId, likeCount }: LikeButtonProps) {
-  const router = useRouter();
+export default function LikeButton({ postId, likeCount = 0, authorId = "", postTitle = "Post" }: LikeButtonProps) {
   const [user, setUser] = useState<User | null>(null);
   const [liked, setLiked] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [count, setCount] = useState(likeCount);
-
-  useEffect(() => {
-    setCount(likeCount);
-  }, [likeCount]);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
     });
+
     return unsubscribe;
   }, []);
 
   useEffect(() => {
-    if (!user) {
-      setLiked(false);
-      return;
-    }
+    const unsubscribe = onValue(
+      ref(db, `likes/${postId}`),
+      (snapshot) => {
+        const data = (snapshot.val() || {}) as Record<string, boolean>;
+        setCount(Object.keys(data).length);
+        setLiked(Boolean(user?.uid) && data[user.uid] === true);
+      },
+      () => {
+        setCount(likeCount);
+        setLiked(false);
+      },
+    );
 
-    const likeRef = ref(db, `likes/${postId}/${user.uid}`);
-    const unsubscribe = onValue(likeRef, (snapshot) => {
-      setLiked(snapshot.val() === true);
-    });
     return () => unsubscribe();
-  }, [postId, user]);
+  }, [likeCount, postId, user?.uid]);
 
-  const handleToggleLike = async () => {
-    if (!user) {
-      alert("Please log in to like posts.");
-      router.push("/login");
+  const handleLike = async () => {
+    if (!user?.uid || busy) {
+      if (!user?.uid) {
+        alert("Please log in to like posts.");
+      }
       return;
     }
 
     try {
       setBusy(true);
+      const userLikeRef = ref(db, `likes/${postId}/${user.uid}`);
+      await set(userLikeRef, liked ? null : true);
 
-      const likeRef = ref(db, `likes/${postId}/${user.uid}`);
-      const toggleResult = await runTransaction(likeRef, (current) => {
-        return current === true ? null : true;
-      });
+      if (!liked && authorId && authorId !== user.uid) {
+        const userSnapshot = await get(ref(db, `users/${user.uid}`));
+        const userData = (userSnapshot.val() || {}) as Record<string, unknown>;
+        const actorName =
+          (typeof userData.displayName === "string" && userData.displayName.trim()) ||
+          user.displayName ||
+          user.email ||
+          "Someone";
 
-      if (!toggleResult.committed) {
-        return;
+        await createNotification(db, {
+          recipientUserId: authorId,
+          type: "like",
+          actorId: user.uid,
+          actorName,
+          href: `/posts/${postId}`,
+          entityId: postId,
+          entityTitle: postTitle,
+          previewText: `${actorName} liked your post.`,
+        });
       }
-
-      const isLikedNow = toggleResult.snapshot.val() === true;
-      const delta = isLikedNow ? 1 : -1;
-
-      const likeCountRef = ref(db, `posts/${postId}/likeCount`);
-      await runTransaction(likeCountRef, (current) => {
-        const safeCurrent = typeof current === "number" ? current : 0;
-        return Math.max(0, safeCurrent + delta);
-      });
-
-      setCount((previous) => Math.max(0, previous + delta));
-    } catch (error) {
-      console.error("Like toggle failed:", error);
-      const message = error instanceof Error ? error.message : "Unable to update like.";
-      alert(message);
+    } catch {
+      alert("Failed to update like.");
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <button className="like-button" onClick={handleToggleLike} disabled={busy}>
+    <button
+      type="button"
+      className="font-medium text-neutral-800 hover:text-black"
+      onClick={(event) => {
+        event.stopPropagation();
+        void handleLike();
+      }}
+      disabled={busy}
+    >
       {liked ? "Unlike" : "Like"} ({count})
     </button>
   );
 }
-

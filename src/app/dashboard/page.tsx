@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { onValue, ref } from "firebase/database";
+import { equalTo, onValue, orderByChild, query, ref } from "firebase/database";
 import { useRouter } from "next/navigation";
 import { auth, db } from "../firebase/config";
 import { normalizePostsMap, type PostRecord } from "../lib/posts";
@@ -16,7 +16,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<PostRecord[]>([]);
-  const [commentTotal, setCommentTotal] = useState(0);
+  const [commentsMap, setCommentsMap] = useState<CommentsMap>({});
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -45,18 +45,16 @@ export default function DashboardPage() {
       return;
     }
 
-    const postsRef = ref(db, "posts");
+    // Fetch all user's posts from /quotes (unified data source)
+    const postsRef = query(ref(db, "quotes"), orderByChild("authorId"), equalTo(user.uid));
     const unsubscribe = onValue(postsRef, (snapshot) => {
       const data = snapshot.val();
-      const allPosts = normalizePostsMap(data);
-      const myPosts = allPosts.filter((post) => {
-        if (post.authorId) {
-          return post.authorId === user.uid;
-        }
-        const fallbackNames = [user.displayName?.toLowerCase(), user.email?.toLowerCase()].filter(Boolean);
-        return fallbackNames.includes(post.authorName.toLowerCase());
+      const userPosts = normalizePostsMap(data);
+      console.log("📊 [DASHBOARD] LOADED USER POSTS FROM /quotes:", {
+        count: userPosts.length,
+        posts: userPosts.map(p => ({ id: p.id, title: p.title, status: p.status })),
       });
-      setPosts(myPosts);
+      setPosts(userPosts);
     });
 
     return () => unsubscribe();
@@ -69,28 +67,28 @@ export default function DashboardPage() {
 
     const commentsRef = ref(db, "comments");
     const unsubscribe = onValue(commentsRef, (snapshot) => {
-      const data = (snapshot.val() || {}) as CommentsMap;
-      const myPostIds = new Set(posts.map((post) => post.id));
-
-      let total = 0;
-      Object.entries(data).forEach(([postId, commentEntries]) => {
-        if (!myPostIds.has(postId) || !commentEntries) {
-          return;
-        }
-        total += Object.keys(commentEntries).length;
-      });
-
-      setCommentTotal(total);
+      setCommentsMap((snapshot.val() || {}) as CommentsMap);
     });
 
     return () => unsubscribe();
-  }, [posts, user]);
+  }, [user]);
 
   const stats = useMemo(() => {
     const totalPosts = posts.length;
+    const totalDrafts = posts.filter((post) => post.status === "draft").length;
+    const totalPrivatePosts = posts.filter((post) => post.visibility === "private").length;
     const totalLikes = posts.reduce((sum, post) => sum + Math.max(0, post.likeCount || 0), 0);
-    return { totalPosts, totalLikes };
-  }, [posts]);
+    const totalViews = posts.reduce((sum, post) => sum + Math.max(0, post.viewCount || 0), 0);
+    const myPostIds = new Set(posts.map((post) => post.id));
+    const totalComments = Object.entries(commentsMap).reduce((sum, [postId, commentEntries]) => {
+      if (!myPostIds.has(postId) || !commentEntries) {
+        return sum;
+      }
+      return sum + Object.keys(commentEntries).length;
+    }, 0);
+
+    return { totalPosts, totalDrafts, totalPrivatePosts, totalLikes, totalViews, totalComments };
+  }, [posts, commentsMap]);
 
   if (loading) {
     return <div className="card">Loading dashboard...</div>;
@@ -110,20 +108,35 @@ export default function DashboardPage() {
           <h2 className="stat-value">{stats.totalPosts}</h2>
         </article>
         <article className="card">
+          <p className="muted-text">Total Drafts</p>
+          <h2 className="stat-value">{stats.totalDrafts}</h2>
+        </article>
+        <article className="card">
+          <p className="muted-text">Total Private Posts</p>
+          <h2 className="stat-value">{stats.totalPrivatePosts}</h2>
+        </article>
+        <article className="card">
           <p className="muted-text">Total Likes Received</p>
           <h2 className="stat-value">{stats.totalLikes}</h2>
         </article>
         <article className="card">
+          <p className="muted-text">Total Views Received</p>
+          <h2 className="stat-value">{stats.totalViews}</h2>
+        </article>
+        <article className="card">
           <p className="muted-text">Total Comments Received</p>
-          <h2 className="stat-value">{commentTotal}</h2>
+          <h2 className="stat-value">{stats.totalComments}</h2>
         </article>
       </section>
 
       <section className="card">
         <h3 style={{ marginTop: 0 }}>Activity Summary</h3>
         <p className="muted-text" style={{ marginBottom: 0 }}>
-          You have published {stats.totalPosts} post{stats.totalPosts === 1 ? "" : "s"}, earned {stats.totalLikes} like
-          {stats.totalLikes === 1 ? "" : "s"}, and received {commentTotal} comment{commentTotal === 1 ? "" : "s"}.
+          You have {stats.totalPosts} total post{stats.totalPosts === 1 ? "" : "s"}, including {stats.totalDrafts} draft
+          {stats.totalDrafts === 1 ? "" : "s"} and {stats.totalPrivatePosts} private post
+          {stats.totalPrivatePosts === 1 ? "" : "s"}, with {stats.totalLikes} like{stats.totalLikes === 1 ? "" : "s"},
+          {stats.totalViews} view{stats.totalViews === 1 ? "" : "s"}, and {stats.totalComments} comment
+          {stats.totalComments === 1 ? "" : "s"} received.
         </p>
       </section>
     </div>

@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const protectedPaths = ["/create", "/profile", "/dashboard"];
+const protectedPaths = ["/create", "/profile", "/dashboard", "/my-drafts"];
 
 function isProtectedPath(pathname: string): boolean {
+  const isEditPath = /^\/posts\/[^/]+\/edit\/?$/.test(pathname);
+  if (isEditPath) {
+    return true;
+  }
   return protectedPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
 }
 
@@ -32,5 +36,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/create/:path*", "/profile/:path*", "/dashboard/:path*"],
+  matcher: ["/create/:path*", "/profile/:path*", "/dashboard/:path*", "/my-drafts/:path*", "/posts/:path*/edit"],
 };
