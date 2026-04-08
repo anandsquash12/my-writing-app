@@ -34,6 +34,7 @@ export default function ChatPageClient() {
   const searchParams = useSearchParams();
   const initialChatId = searchParams.get("chatId") || "";
   const [recipientId, setRecipientId] = useState("");
+  const [recipientError, setRecipientError] = useState("");
   const [messageText, setMessageText] = useState("");
   const [chatList, setChatList] = useState<ChatRecord[]>([]);
   const [selectedChatId, setSelectedChatId] = useState(initialChatId);
@@ -125,8 +126,10 @@ export default function ChatPageClient() {
     : "";
 
   const handleCreateChat = async () => {
+    setRecipientError("");
+
     if (!user?.uid) {
-      alert("Please log in to start chatting.");
+      setRecipientError("Please log in to start chatting.");
       return;
     }
 
@@ -135,20 +138,62 @@ export default function ChatPageClient() {
       return;
     }
 
+    if (nextRecipientId === user.uid) {
+      setRecipientError("You cannot start a chat with yourself.");
+      return;
+    }
+
     try {
       setCreatingChat(true);
-      const snapshot = await get(ref(db, `users/${nextRecipientId}`));
 
-      if (!snapshot.exists()) {
-        throw new Error("That user does not exist.");
+      const exactSnapshot = await get(ref(db, `users/${nextRecipientId}`));
+      let targetRecipientId = "";
+
+      if (exactSnapshot.exists()) {
+        targetRecipientId = nextRecipientId;
+      } else {
+        const usersSnapshot = await get(ref(db, "users"));
+        const usersData = (usersSnapshot.val() || {}) as Record<string, unknown>;
+        const normalizedSearch = nextRecipientId.toLowerCase();
+
+        const exactMatches = Object.entries(usersData).filter(([uid, rawUser]) => {
+          const userData = (rawUser || {}) as Record<string, unknown>;
+          const displayName = typeof userData.displayName === "string" ? userData.displayName.trim().toLowerCase() : "";
+          const email = typeof userData.email === "string" ? userData.email.trim().toLowerCase() : "";
+          return uid === nextRecipientId || displayName === normalizedSearch || email === normalizedSearch;
+        });
+
+        if (exactMatches.length === 1) {
+          targetRecipientId = exactMatches[0][0];
+        } else if (exactMatches.length > 1) {
+          throw new Error("Multiple users match that name. Please enter the exact user ID.");
+        } else {
+          const fuzzyMatches = Object.entries(usersData).filter(([uid, rawUser]) => {
+            const userData = (rawUser || {}) as Record<string, unknown>;
+            const displayName = typeof userData.displayName === "string" ? userData.displayName.trim().toLowerCase() : "";
+            const email = typeof userData.email === "string" ? userData.email.trim().toLowerCase() : "";
+            return (
+              displayName.includes(normalizedSearch) ||
+              email.includes(normalizedSearch)
+            );
+          });
+
+          if (fuzzyMatches.length === 1) {
+            targetRecipientId = fuzzyMatches[0][0];
+          } else if (fuzzyMatches.length > 1) {
+            throw new Error("Multiple users match that search. Please enter the exact user ID.");
+          } else {
+            throw new Error("User not found. Please verify the user ID, email, or exact display name and try again.");
+          }
+        }
       }
 
-      const chatId = await createChat(db, user.uid, nextRecipientId);
+      const chatId = await createChat(db, user.uid, targetRecipientId);
       setSelectedChatId(chatId);
       setRecipientId("");
     } catch (error) {
       console.error("Create chat failed:", error);
-      alert(error instanceof Error ? error.message : "Could not create chat.");
+      setRecipientError(error instanceof Error ? error.message : "Could not create chat.");
     } finally {
       setCreatingChat(false);
     }
@@ -188,14 +233,14 @@ export default function ChatPageClient() {
       <aside className="overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-sm">
         <div className="border-b border-neutral-100 p-4">
           <h1 className="text-xl font-semibold text-neutral-900">Messages</h1>
-          <p className="mt-1 text-sm text-neutral-500">Start a direct chat with any user ID.</p>
+          <p className="mt-1 text-sm text-neutral-500">Start a direct chat by user ID or exact display name.</p>
           <div className="mt-4 flex gap-2">
             <input
               type="text"
               value={recipientId}
               onChange={(event) => setRecipientId(event.target.value)}
-              placeholder="Enter recipient user ID"
-              className="flex-1 rounded-2xl border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
+              placeholder="Enter recipient user ID or exact display name"
+              className="flex-1 rounded-2xl border border-neutral-300 px-3 py-2 text-sm text-neutral-900 outline-none focus:border-neutral-500"
             />
             <button
               type="button"
@@ -207,6 +252,9 @@ export default function ChatPageClient() {
               {creatingChat ? "Starting..." : "Start"}
             </button>
           </div>
+          {recipientError ? (
+            <p className="mt-2 px-2 text-sm text-red-600">{recipientError}</p>
+          ) : null}
         </div>
 
         <div className="max-h-[70vh] overflow-y-auto">
@@ -295,7 +343,7 @@ export default function ChatPageClient() {
                     }
                   }}
                   placeholder="Type a message"
-                  className="flex-1 rounded-2xl border border-neutral-300 px-3 py-3 text-sm outline-none focus:border-neutral-500"
+                  className="flex-1 rounded-2xl border border-neutral-300 bg-white text-neutral-900 px-3 py-3 text-sm outline-none focus:border-neutral-500"
                 />
                 <button
                   type="button"

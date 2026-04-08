@@ -134,55 +134,55 @@ export default function InstagramPostCard({ post }: InstagramPostCardProps) {
   return (
     <div
       onClick={() => router.push(`/quotes/${post.id}`)}
-      className="cursor-pointer overflow-hidden rounded-2xl bg-white shadow-md transition-all duration-200 hover:scale-[1.01] hover:shadow-lg"
+      className="cursor-pointer overflow-hidden rounded-[30px] border border-white/10 bg-[#121218]/92 shadow-xl transition-all duration-200 hover:scale-[1.01] hover:shadow-2xl"
     >
-      <div className="border-b border-gray-100 p-4">
+      <div className="border-b border-white/8 p-5">
         <div className="flex items-center space-x-3">
           <UserAvatar name={displayAuthorName} src={avatarUrl} size="md" />
           <div className="flex-1">
             <Link
               href={`/writers/${post.authorId}`}
               onClick={(event) => event.stopPropagation()}
-              className="text-sm font-semibold hover:underline"
+              className="text-sm font-semibold text-[#f4ede0] hover:underline"
             >
               {displayAuthorName}
             </Link>
-            <p className="text-xs text-gray-500">{new Date(post.createdAt).toLocaleDateString()}</p>
+            <p className="text-xs text-[#a89f90]">{new Date(post.createdAt).toLocaleDateString()}</p>
           </div>
         </div>
       </div>
 
       {!safeImageUrl ? null : (
-        <div className="relative aspect-square w-full overflow-hidden bg-gray-200">
+        <div className="relative aspect-square w-full overflow-hidden bg-white/5">
           <img src={safeImageUrl} alt="Quote" className="h-full w-full object-cover transition-transform duration-300 hover:scale-105" />
         </div>
       )}
 
-      <div className="space-y-3 p-4">
+      <div className="space-y-3 p-5">
         <div className="space-y-2">
-          {primaryText ? <p className="text-sm font-semibold leading-relaxed text-gray-800">{primaryText}</p> : null}
-          {secondaryText ? <p className="text-sm leading-relaxed text-gray-600">{secondaryText}</p> : null}
+          {primaryText ? <p className="serif-display text-lg font-semibold leading-relaxed text-[#f1eadb]">{primaryText}</p> : null}
+          {secondaryText ? <p className="text-sm leading-relaxed text-[#c7bdad]">{secondaryText}</p> : null}
         </div>
 
-        <div className="flex items-center space-x-4 border-t border-gray-100 pt-2">
+        <div className="flex items-center space-x-4 border-t border-white/8 pt-3">
           <button
             type="button"
             onClick={handleLike}
             className={`flex items-center space-x-2 text-sm font-medium transition-colors ${
-              liked ? "text-red-500" : "text-gray-600 hover:text-red-500"
+              liked ? "text-[#ff9e9e]" : "text-[#cfc6b6] hover:text-[#ffb7b7]"
             }`}
           >
             <span className="text-lg">{liked ? "Love" : "Like"}</span>
             <span>{likeCount}</span>
           </button>
 
-          <div className="flex items-center space-x-2 text-sm font-medium text-gray-600">
+          <div className="flex items-center space-x-2 text-sm font-medium text-[#cfc6b6]">
             <span>Comment</span>
           </div>
 
           <button
             type="button"
-            className="flex items-center space-x-2 text-sm font-medium text-gray-600"
+            className="flex items-center space-x-2 text-sm font-medium text-[#cfc6b6]"
             onClick={async (event) => {
               event.preventDefault();
               event.stopPropagation();

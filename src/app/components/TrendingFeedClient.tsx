@@ -133,11 +133,11 @@ export default function TrendingFeedClient({ limit, showViewAllLink = false }: T
   return (
     <div className="stack">
       <section className="post-list">
-        {trendingItems.map((item) =>
+        {trendingItems.map((item, index) =>
           item.kind === "quote" ? (
-            <InstagramPostCard key={`quote-${item.id}`} post={item.data} />
+            <InstagramPostCard key={`quote-${item.id}-${index}`} post={item.data} />
           ) : (
-            <PostCard key={`post-${item.id}`} post={item.data} excerpt />
+            <PostCard key={`post-${item.id}-${index}`} post={item.data} excerpt />
           ),
         )}
       </section>

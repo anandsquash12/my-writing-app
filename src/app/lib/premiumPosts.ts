@@ -4,7 +4,10 @@ export interface PremiumPost {
   previewText: string;
   fullContent: string;
   category: PremiumPostCategory;
-  price: number; // in INR
+  price: number; // personal unlock price in INR
+  personalPrice: number;
+  commercialPrice: number;
+  licenseConfirmed: boolean;
   imageUrl?: string;
   userId: string;
   authorName: string;
@@ -43,6 +46,9 @@ interface RawPremiumPost {
   fullContent?: unknown;
   category?: unknown;
   price?: unknown;
+  personalPrice?: unknown;
+  commercialPrice?: unknown;
+  licenseConfirmed?: unknown;
   imageUrl?: unknown;
   userId?: unknown;
   authorName?: unknown;
@@ -58,6 +64,10 @@ function toSafeString(value: unknown): string {
 function toSafeNumber(value: unknown): number {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
+  }
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
   }
   return 0;
 }
@@ -90,13 +100,22 @@ export function normalizePremiumPost(id: string, source: unknown): PremiumPost |
     return null;
   }
 
+  const rawPersonalPrice = toSafeNumber(data.personalPrice);
+  const rawLegacyPrice = toSafeNumber(data.price);
+  const personalPrice = rawPersonalPrice || rawLegacyPrice || 0;
+  const commercialPrice =
+    toSafeNumber(data.commercialPrice) || Math.max(personalPrice * 2, personalPrice, 0);
+
   return {
     id,
     title,
     previewText,
     fullContent,
     category: toSafeCategory(data.category),
-    price: toSafeNumber(data.price),
+    price: personalPrice,
+    personalPrice,
+    commercialPrice,
+    licenseConfirmed: Boolean(data.licenseConfirmed),
     imageUrl: toSafeString(data.imageUrl),
     userId,
     authorName,

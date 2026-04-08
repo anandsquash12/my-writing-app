@@ -1,8 +1,14 @@
+export type LicenseType = "personal" | "commercial";
+
 export interface Purchase {
   id: string;
   userId: string;
+  creatorId?: string;
   postId: string;
   amount: number; // in INR
+  licenseType: LicenseType;
+  creatorEarning?: number;
+  platformFee?: number;
   razorpayPaymentId?: string;
   razorpayOrderId?: string;
   createdAt: number;
@@ -10,8 +16,12 @@ export interface Purchase {
 
 interface RawPurchase {
   userId?: unknown;
+  creatorId?: unknown;
   postId?: unknown;
   amount?: unknown;
+  licenseType?: unknown;
+  creatorEarning?: unknown;
+  platformFee?: unknown;
   razorpayPaymentId?: unknown;
   razorpayOrderId?: unknown;
   createdAt?: unknown;
@@ -25,7 +35,18 @@ function toSafeNumber(value: unknown): number {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
   }
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
   return 0;
+}
+
+function toSafeLicenseType(value: unknown): LicenseType {
+  if (value === "commercial") {
+    return "commercial";
+  }
+  return "personal";
 }
 
 export function normalizePurchase(id: string, source: unknown): Purchase | null {
@@ -45,8 +66,12 @@ export function normalizePurchase(id: string, source: unknown): Purchase | null 
   return {
     id,
     userId,
+    creatorId: toSafeString(data.creatorId).trim() || undefined,
     postId,
     amount: toSafeNumber(data.amount),
+    licenseType: toSafeLicenseType(data.licenseType),
+    creatorEarning: toSafeNumber(data.creatorEarning),
+    platformFee: toSafeNumber(data.platformFee),
     razorpayPaymentId: toSafeString(data.razorpayPaymentId),
     razorpayOrderId: toSafeString(data.razorpayOrderId),
     createdAt: toSafeNumber(data.createdAt),

@@ -314,30 +314,36 @@ export default function PostCard({
 
   return (
     <article
-      className="overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+      className="overflow-hidden rounded-[30px] border border-white/10 bg-[#121218]/92 shadow-xl transition hover:-translate-y-0.5 hover:shadow-2xl"
       role="link"
       tabIndex={0}
       onClick={handleCardClick}
       onKeyDown={handleCardKeyDown}
     >
-      <div className="flex items-start justify-between gap-4 border-b border-neutral-100 px-4 py-4">
+      <div className="flex items-start justify-between gap-4 border-b border-white/8 px-5 py-5">
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-semibold text-neutral-900">{post.title}</h2>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-neutral-500">
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-[0.16em] text-[#b5ab9c]">
+            <span className="rounded-full border border-[#d6a56f]/20 bg-[#d6a56f]/10 px-3 py-1">{post.type}</span>
+            <span>{post.language}</span>
+            <span>•</span>
+            <span>{post.likeCount} likes</span>
+          </div>
+          <h2 className="serif-display text-3xl leading-tight text-[#f5efe2]">{post.title}</h2>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-[#a89f90]">
             <UserAvatar name={displayAuthorName} src={avatarSrc} size="sm" className="pointer-events-none" />
             <span>By</span>
             {!post.isAnonymous && post.authorId ? (
               <Link
                 href={`/writers/${post.authorId}`}
-                className="font-medium text-neutral-700 hover:text-neutral-900"
+                className="font-medium text-[#efe7d6] hover:text-white"
                 onClick={stopCardClick}
               >
                 {displayAuthorName}
               </Link>
             ) : (
-              <span className="font-medium text-neutral-700">{displayAuthorName}</span>
+              <span className="font-medium text-[#efe7d6]">{displayAuthorName}</span>
             )}
-            <span>&middot;</span>
+            <span>•</span>
             <span>{formatDate(post.createdAt)}</span>
           </div>
         </div>
@@ -347,7 +353,7 @@ export default function PostCard({
             type="button"
             onClick={handleDelete}
             disabled={deleting}
-            className="inline-flex items-center gap-2 rounded-full border border-red-200 px-3 py-1 text-sm font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-70"
+            className="inline-flex items-center gap-2 rounded-full border border-[#ff9e9e]/20 px-3 py-1 text-sm font-medium text-[#ffb7b7] hover:bg-[#ff9e9e]/8 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {deleting ? <ButtonSpinner /> : null}
             {deleting ? "Deleting..." : "Delete"}
@@ -356,46 +362,46 @@ export default function PostCard({
       </div>
 
       {!hideContent ? (
-        <div className="px-4 py-4">
-          <p className="whitespace-pre-wrap text-sm leading-7 text-neutral-700">{previewText || "No content yet."}</p>
+        <div className="px-5 py-5">
+          <p className="serif-display whitespace-pre-wrap text-xl leading-9 text-[#e4dccd]">{previewText || "No content yet."}</p>
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-3 border-t border-neutral-100 px-4 py-3 text-sm text-neutral-700">
+      <div className="flex flex-wrap items-center gap-3 border-t border-white/8 px-5 py-4 text-sm text-[#cfc6b6]">
         {!hideSupportButton ? <LikeButton postId={post.id} likeCount={post.likeCount} authorId={post.authorId} postTitle={post.title} /> : null}
         <span>Comments {comments.length}</span>
-        <button type="button" className="font-medium hover:text-black" onClick={handleShare}>
+        <button type="button" className="font-medium hover:text-white" onClick={handleShare}>
           {copied ? "Copied" : "Share"}
         </button>
         <button
           type="button"
-          className="inline-flex items-center gap-2 font-medium hover:text-black disabled:cursor-not-allowed disabled:opacity-70"
+          className="inline-flex items-center gap-2 font-medium hover:text-white disabled:cursor-not-allowed disabled:opacity-70"
           onClick={handleReport}
           disabled={reporting}
         >
           {reporting ? <ButtonSpinner /> : null}
           {reporting ? "Reporting..." : "Report"}
         </button>
-        <Link href={postHref} className="font-medium hover:text-black" onClick={stopCardClick}>
+        <Link href={postHref} className="font-medium hover:text-white" onClick={stopCardClick}>
           View
         </Link>
       </div>
 
       {commentsEnabled ? (
-        <div className="border-t border-neutral-100 px-4 py-4" onClick={stopCardClick}>
+        <div className="border-t border-white/8 px-5 py-5" onClick={stopCardClick}>
           <div className="flex gap-2">
             <input
               type="text"
               value={commentText}
               onChange={(event) => setCommentText(event.target.value)}
               placeholder={user ? "Write a comment..." : "Login to comment"}
-              className="flex-1 rounded-2xl border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
+              className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-[#d6a56f]/45"
             />
             <button
               type="button"
               onClick={handleCommentSubmit}
               disabled={commentSaving || !commentText.trim()}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-black disabled:cursor-not-allowed disabled:opacity-70"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#f0c18d] px-4 py-2 text-sm font-semibold text-[#140f0b] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
             >
               {commentSaving ? <ButtonSpinner /> : null}
               {commentSaving ? "Posting..." : "Post"}
@@ -404,13 +410,13 @@ export default function PostCard({
 
           <div className="mt-4 space-y-3">
             {comments.length === 0 ? (
-              <p className="text-sm text-neutral-500">No comments yet.</p>
+              <p className="text-sm text-[#a89f90]">No comments yet.</p>
             ) : (
               comments.map((comment) => (
-                <div key={comment.id} className="rounded-2xl bg-neutral-50 px-3 py-3">
-                  <p className="text-sm text-neutral-800">{comment.text}</p>
-                  <p className="mt-1 text-xs text-neutral-500">
-                    {comment.userName} &middot; {formatDate(comment.createdAt)}
+                <div key={comment.id} className="rounded-2xl border border-white/8 bg-white/4 px-3 py-3">
+                  <p className="text-sm text-[#ece3d4]">{comment.text}</p>
+                  <p className="mt-1 text-xs text-[#a89f90]">
+                    {comment.userName} • {formatDate(comment.createdAt)}
                   </p>
                 </div>
               ))

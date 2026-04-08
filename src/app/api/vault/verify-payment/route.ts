@@ -1,54 +1,47 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 
-function verifyPaymentSignature(
-  paymentId: string,
-  orderId: string,
-  signature: string,
-): boolean {
-  const key_secret = process.env.RAZORPAY_KEY_SECRET;
-  if (!key_secret) return false;
+function verifyPaymentSignature(paymentId: string, orderId: string, signature: string): boolean {
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  if (!keySecret) {
+    return false;
+  }
 
-  const hmac = crypto.createHmac("sha256", key_secret);
+  const hmac = crypto.createHmac("sha256", keySecret);
   hmac.update(`${orderId}|${paymentId}`);
-  const digest = hmac.digest("hex");
-  return digest === signature;
+  return hmac.digest("hex") === signature;
 }
 
 export async function POST(request: Request) {
   try {
     const { paymentId, orderId, signature, postId, userId } = await request.json();
 
-    if (!paymentId || !orderId || !signature) {
-      return NextResponse.json(
-        { error: "Missing payment details" },
-        { status: 400 }
-      );
+    if (
+      typeof paymentId !== "string" ||
+      typeof orderId !== "string" ||
+      typeof signature !== "string" ||
+      typeof postId !== "string" ||
+      typeof userId !== "string"
+    ) {
+      return NextResponse.json({ error: "Missing payment details" }, { status: 400 });
     }
 
-    // Verify signature
     const isValid = verifyPaymentSignature(paymentId, orderId, signature);
 
     if (!isValid) {
-      return NextResponse.json(
-        { error: "Payment signature verification failed" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Payment signature verification failed" }, { status: 400 });
     }
 
-    // Payment is verified successfully
-    // Database entry will be saved on client side
     return NextResponse.json({
       success: true,
-      message: "Payment verified successfully",
       paymentId,
       orderId,
+      postId,
+      userId,
+      verifiedAt: Date.now(),
     });
   } catch (error) {
     console.error("Error verifying payment:", error);
-    return NextResponse.json(
-      { error: "Failed to verify payment" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to verify payment" }, { status: 500 });
   }
 }

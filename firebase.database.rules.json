@@ -5,7 +5,7 @@
     "users": {
       ".read": true,
       "$uid": {
-        ".write": "auth != null && auth.uid === $uid"
+        ".write": "auth != null && (auth.uid === $uid || auth.token.email === 'admin@gmail.com')"
       }
     },
     "quotes": {
@@ -126,6 +126,17 @@
         ".read": "auth != null && data.child('userId').val() === auth.uid",
         ".write": "auth != null && !data.exists() && newData.child('userId').val() === auth.uid"
       }
+    },
+    "payoutRequests": {
+      ".read": false,
+      "$requestId": {
+        ".read": "auth != null && (data.child('userId').val() === auth.uid || auth.token.email === 'admin@gmail.com')",
+        ".write": "auth != null && ((!data.exists() && newData.child('userId').val() === auth.uid && newData.child('status').val() === 'pending' && newData.child('createdAt').isNumber()) || (data.exists() && auth.token.email === 'admin@gmail.com'))"
+      }
+    },
+    "platformStats": {
+      ".read": true,
+      ".write": "auth != null"
     },
     "confessions": {
       ".read": true,

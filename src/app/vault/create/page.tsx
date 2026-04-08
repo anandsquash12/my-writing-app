@@ -15,10 +15,10 @@ export default function CreatePremiumPostPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-xl text-gray-900 mb-4">You must be logged in to create premium content</p>
-          <button onClick={() => router.push("/login")} className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">
+      <div className="min-h-screen bg-[#09090b] py-12 px-4 text-center text-[#ece3d4]">
+        <div className="mx-auto max-w-xl rounded-[32px] border border-white/10 bg-[#121218]/95 p-10 shadow-2xl">
+          <p className="text-xl font-semibold mb-4">You must be logged in to publish premium writing.</p>
+          <button onClick={() => router.push("/login")} className="rounded-full bg-[#f0c18d] px-6 py-3 text-sm font-semibold text-[#140f0b] transition hover:opacity-90">
             Sign In
           </button>
         </div>
@@ -27,11 +27,14 @@ export default function CreatePremiumPostPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-2xl mx-auto px-4">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">✨ Create Premium Post</h1>
-          <p className="text-gray-600">Share exclusive content and earn from your work</p>
+    <div className="min-h-screen bg-[#09090b] py-12 px-4 text-[#ece3d4]">
+      <div className="mx-auto max-w-4xl space-y-8">
+        <div className="rounded-[32px] border border-white/10 bg-[#121218]/95 p-8 shadow-2xl">
+          <p className="hero-tag">Writers Vault</p>
+          <h1 className="serif-display mt-4 text-4xl text-[#f5efe2]">Create premium writing that earns.</h1>
+          <p className="mt-4 max-w-2xl text-base leading-7 text-[#d2c8b7]">
+            Add personal and commercial license pricing, confirm ownership, and reach readers who want to pay for your best work.
+          </p>
         </div>
 
         <PremiumPostForm

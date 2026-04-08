@@ -5,11 +5,9 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { get, onValue, ref } from "firebase/database";
 import { auth, db } from "../firebase/config";
-import { type PremiumPost, normalizePremiumPost } from "../lib/premiumPosts";
-import { type Purchase, normalizePurchasesMap } from "../lib/purchases";
-import UserAvatar from "../components/ui/UserAvatar";
+import { normalizePremiumPost, type PremiumPost } from "../lib/premiumPosts";
+import { normalizePurchasesMap, type Purchase } from "../lib/purchases";
 import { ProfileShimmer } from "../components/ui/Loading";
-import { withAvatarVersion } from "../lib/avatar";
 
 interface PurchaseWithPost extends Purchase {
   post?: PremiumPost;
@@ -29,31 +27,22 @@ export default function MyPurchasesPage() {
   }, []);
 
   useEffect(() => {
-    if (!user?.uid) {
+    if (!user?.uid || !db) {
       setPurchases([]);
       setLoading(false);
       return;
     }
 
-    // Load all purchases for current user
     const purchasesRef = ref(db, "purchases");
     const unsubscribePurchases = onValue(purchasesRef, async (snapshot) => {
-      const data = snapshot.val();
-      const allPurchases = normalizePurchasesMap(data);
-      const userPurchases = allPurchases.filter((purchase) => purchase.userId === user.uid);
+      const userPurchases = normalizePurchasesMap(snapshot.val()).filter((purchase) => purchase.userId === user.uid);
 
-      // Load post details for each purchase
       const purchasesWithPosts = await Promise.all(
         userPurchases.map(async (purchase) => {
           try {
             const postSnapshot = await get(ref(db, `premiumPosts/${purchase.postId}`));
-            const postData = postSnapshot.val();
-            const post = normalizePremiumPost(purchase.postId, postData);
-
-            return {
-              ...purchase,
-              post: post || undefined,
-            };
+            const post = normalizePremiumPost(purchase.postId, postSnapshot.val());
+            return { ...purchase, post: post || undefined };
           } catch {
             return purchase;
           }
@@ -68,95 +57,70 @@ export default function MyPurchasesPage() {
   }, [user?.uid]);
 
   if (loading) {
-    return (
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <ProfileShimmer />
-      </div>
-    );
+    return <ProfileShimmer />;
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-xl text-gray-900 mb-4">You must be logged in to view your purchases</p>
-          <Link href="/login" className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">
-            Sign In
-          </Link>
-        </div>
+      <div className="rounded-[32px] border border-white/10 bg-[#121218]/92 px-8 py-16 text-center shadow-2xl">
+        <p className="serif-display text-4xl text-[#f5efe2]">Sign in to view your purchases</p>
+        <Link href="/login" className="primary-button mt-6">
+          Sign In
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-4">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">📖 My Purchases</h1>
-          <p className="text-lg text-gray-600">Premium content you've unlocked</p>
-        </div>
+    <div className="space-y-6">
+      <section className="rounded-[32px] border border-white/10 bg-[#121218]/92 p-8 shadow-2xl">
+        <p className="hero-tag">Library</p>
+        <h1 className="serif-display mt-4 text-5xl text-[#f5efe2]">My Purchases</h1>
+        <p className="mt-4 text-lg leading-8 text-[#d2c8b7]">Your unlocked premium writing lives here, ready to revisit any time.</p>
+      </section>
 
-        {/* Content */}
-        {purchases.length > 0 ? (
-          <div className="space-y-4">
-            {purchases.map((purchase) => {
-              if (!purchase.post) return null;
+      {purchases.length > 0 ? (
+        <div className="space-y-4">
+          {purchases.map((purchase) => {
+            if (!purchase.post) {
+              return null;
+            }
 
-              const post = purchase.post;
-              const purchaseDate = new Date(purchase.createdAt).toLocaleDateString("en-IN", {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              });
-
-              return (
-                <Link key={purchase.id} href={`/vault/${post.id}`}>
-                  <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-6 cursor-pointer">
-                    <div className="flex gap-4">
-                      {/* Thumbnail */}
-                      {post.imageUrl && (
-                        <div className="flex-shrink-0 w-32 h-32 rounded-lg overflow-hidden bg-gray-100">
-                          <img src={post.imageUrl} alt={post.title} className="w-full h-full object-cover" />
-                        </div>
-                      )}
-
-                      {/* Content */}
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">{post.title}</h3>
-                        <p className="text-sm text-gray-700 mb-3 line-clamp-2">{post.previewText}</p>
-
-                        <div className="flex items-center gap-4 text-xs text-gray-500">
-                          <span>By {post.authorName}</span>
-                          <span>Purchased {purchaseDate}</span>
-                        </div>
-                      </div>
-
-                      {/* CTA */}
-                      <div className="flex-shrink-0 flex items-center">
-                        <div className="text-center">
-                          <div className="text-green-600 font-semibold mb-2">✓ Unlocked</div>
-                          <button className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded hover:bg-blue-700">
-                            Read
-                          </button>
-                        </div>
-                      </div>
+            return (
+              <Link key={purchase.id} href={`/vault/${purchase.post.id}`} className="rounded-[28px] border border-white/10 bg-[#121218]/92 p-5 shadow-xl transition hover:-translate-y-0.5">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center">
+                  {purchase.post.imageUrl ? (
+                    <div className="h-28 w-full overflow-hidden rounded-[20px] bg-white/5 md:w-40">
+                      <img src={purchase.post.imageUrl} alt={purchase.post.title} className="h-full w-full object-cover" />
                     </div>
+                  ) : null}
+                  <div className="flex-1">
+                    <p className="text-xs uppercase tracking-[0.16em] text-[#a99f90]">
+                      Purchased {new Date(purchase.createdAt).toLocaleDateString("en-IN")}
+                    </p>
+                    <h3 className="serif-display mt-2 text-3xl text-[#f5efe2]">{purchase.post.title}</h3>
+                    <p className="mt-2 text-sm leading-7 text-[#cfc6b6]">{purchase.post.previewText}</p>
                   </div>
-                </Link>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="text-center py-16 bg-white rounded-lg shadow-sm">
-            <p className="text-lg text-gray-600">You haven't purchased any premium content yet</p>
-            <p className="text-sm text-gray-500 mt-2">Explore the Writers Vault to find amazing premium content</p>
-            <Link href="/vault" className="mt-6 inline-block px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">
-              Browse Vault
-            </Link>
-          </div>
-        )}
-      </div>
+                  <div className="space-y-2 text-right">
+                  <div className="rounded-full border border-[#9ddeaf]/20 bg-[#9ddeaf]/10 px-4 py-2 text-sm font-semibold text-[#dff5e3]">
+                    Unlocked
+                  </div>
+                  <p className="text-xs uppercase tracking-[0.16em] text-[#a89f90]">{purchase.licenseType === "commercial" ? "Commercial license" : "Personal license"}</p>
+                </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="rounded-[30px] border border-dashed border-white/10 bg-[#121218]/90 p-10 text-center">
+          <p className="serif-display text-3xl text-[#f3ead9]">No purchases yet</p>
+          <p className="mt-2 text-sm text-[#a89f90]">Explore the Writers Vault and unlock premium stories, lyrics, and poetry.</p>
+          <Link href="/vault" className="outline-link mt-6">
+            Browse Vault
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

@@ -87,7 +87,7 @@ export default function LikeButton({ postId, likeCount = 0, authorId = "", postT
   return (
     <button
       type="button"
-      className="font-medium text-neutral-800 hover:text-black"
+      className="font-medium text-[#cfc6b6] hover:text-white transition-colors"
       onClick={(event) => {
         event.stopPropagation();
         void handleLike();

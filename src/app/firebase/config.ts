@@ -1,15 +1,6 @@
 import { initializeApp } from "firebase/app";
-import { getDatabase } from "firebase/database";
 import { getAuth } from "firebase/auth";
-
-// Debug env loading
-console.log("🔍 FIREBASE ENV DEBUG:");
-console.log("NEXT_PUBLIC_FIREBASE_API_KEY:", process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? "✅" : "❌");
-console.log("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:", process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "❌");
-console.log("NEXT_PUBLIC_FIREBASE_DATABASE_URL:", process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || "❌");
-console.log("NEXT_PUBLIC_FIREBASE_PROJECT_ID:", process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "❌");
-console.log("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID:", process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "❌");
-console.log("NEXT_PUBLIC_FIREBASE_APP_ID:", process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "❌");
+import { getDatabase } from "firebase/database";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -21,23 +12,21 @@ const firebaseConfig = {
   databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
 };
 
-let app = null;
-let auth = null;
-let database = null;
-
-const hasFirebaseConfig =
+const hasFirebaseConfig = Boolean(
   firebaseConfig.apiKey &&
-  firebaseConfig.authDomain &&
-  firebaseConfig.projectId &&
-  firebaseConfig.databaseURL;
+    firebaseConfig.authDomain &&
+    firebaseConfig.projectId &&
+    firebaseConfig.databaseURL,
+);
 
-if (!hasFirebaseConfig) {
-  console.error("Firebase config missing required env vars. Next.js cannot initialize Firebase.");
-} else {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  database = getDatabase(app);
+const app = hasFirebaseConfig ? initializeApp(firebaseConfig) : null;
+
+if (!hasFirebaseConfig && typeof window !== "undefined") {
+  console.error("Firebase config missing required env vars.");
 }
+
+const auth = app ? getAuth(app) : null;
+const database = app ? getDatabase(app) : null;
 
 export { auth, database };
 export const db = database;

@@ -1,18 +1,30 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Cormorant_Garamond, Inter } from "next/font/google";
 import AppProviders from "./components/AppProviders";
 import NavBar from "./components/NavBar";
 import "./globals.css";
 
+const bodyFont = Inter({
+  subsets: ["latin"],
+  variable: "--font-body",
+});
+
+const displayFont = Cormorant_Garamond({
+  subsets: ["latin"],
+  variable: "--font-display",
+  weight: ["400", "500", "600", "700"],
+});
+
 export const metadata: Metadata = {
   title: {
-    default: "ShabadLok | Share Your Words",
+    default: "ShabadLok | Write. Share. Earn.",
     template: "%s | ShabadLok",
   },
-  description: "Discover, write, and share shayari with writers from around the world.",
+  description: "Write, share, and earn from poetry, lyrics, and stories in a premium social platform for writers.",
   openGraph: {
     title: "ShabadLok",
-    description: "Discover, write, and share shayari with writers from around the world.",
+    description: "Turn your poetry, lyrics, and stories into income with a premium platform built for writers.",
     type: "website",
   },
 };
@@ -24,7 +36,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
+      <body className={`${bodyFont.variable} ${displayFont.variable}`}>
         <AppProviders>
           <NavBar />
           <main className="app-shell">{children}</main>
@@ -43,6 +55,7 @@ export default function RootLayout({
                 Terms
               </Link>
             </div>
+            <p className="muted-text">Built for writers who want audience, trust, and income.</p>
             <p className="muted-text">© {new Date().getFullYear()} ShabadLok</p>
           </footer>
         </AppProviders>
